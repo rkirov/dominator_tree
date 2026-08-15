@@ -69,9 +69,15 @@ an algorithm. `Algorithm.lean` closes part of that gap: `idom?` computes the
 tree in one pass, verified against this specification, for any graph supplied
 with a topological rank. Two limits remain. The rank has to be given by the
 caller, because deriving one from acyclicity is a topological sort we have not
-formalised. The climb terminates by typing rather than by an invariant: the parent lookup
-returns `{u // rank u < rank v}`, so the recursion measure falls out of the
-result type.
+formalised. The tree is built incrementally: vertices are processed in rank order and each
+parent is stored in a `Table`, so every parent is computed exactly once. The
+climb terminates by typing rather than by an invariant — the table hands back
+`{u // rank u < rank v}`, so the recursion measure falls out of the result type.
+
+The `Table` must be data, not a function: a function-valued table is a partial
+application that recomputes the whole construction on every lookup, which costs
+an exponential blow-up. Only `Table.get`, `Table.insert` and two lemmas about
+them touch the representation.
 
 For graphs with no topological rank — irreducible ones — the remaining
 algorithms are, in increasing order of both speed and difficulty:
