@@ -133,23 +133,51 @@ theorem eq_of_length_zero : ∀ {u w : Vertex verts} (p : Path g u w), p.length 
   | cons _ _ => intro h; simp [length] at h
 
 /-- A path can be cut at any vertex it visits, into a prefix and a suffix whose
-lengths add up to the whole. -/
+lengths add up to the whole and which visit only vertices of the original. -/
 theorem exists_split : ∀ {u w : Vertex verts} (p : Path g u w) (x : Vertex verts),
-    x ∈ p.vertices → ∃ (q : Path g u x) (r : Path g x w), q.length + r.length = p.length := by
+    x ∈ p.vertices → ∃ (q : Path g u x) (r : Path g x w),
+      q.length + r.length = p.length ∧
+      (∀ y ∈ q.vertices, y ∈ p.vertices) ∧ (∀ y ∈ r.vertices, y ∈ p.vertices) := by
   intro u w p
   induction p with
   | nil v =>
     intro x hx
     simp [vertices] at hx
     subst hx
-    exact ⟨.nil _, .nil _, rfl⟩
+    exact ⟨.nil _, .nil _, rfl, fun _ h => h, fun _ h => h⟩
   | cons h p' ih =>
     intro x hx
     simp [vertices] at hx
     rcases hx with rfl | hx
-    · exact ⟨.nil _, .cons h p', by simp [length]⟩
-    · obtain ⟨q, r, hqr⟩ := ih x hx
-      exact ⟨.cons h q, r, by simp [length]; omega⟩
+    · refine ⟨.nil _, .cons h p', by simp [length], ?_, fun _ hy => hy⟩
+      intro y hy
+      simp [vertices] at hy ⊢
+      exact Or.inl hy
+    · obtain ⟨q, r, hqr, hqv, hrv⟩ := ih x hx
+      refine ⟨.cons h q, r, by simp [length]; omega, ?_, ?_⟩
+      · intro y hy
+        simp [vertices] at hy ⊢
+        rcases hy with rfl | hy
+        · exact Or.inl rfl
+        · exact Or.inr (hqv y hy)
+      · intro y hy
+        simp [vertices]
+        exact Or.inr (hrv y hy)
+
+/-- A path with at least one edge has a last edge, whose source it visits. -/
+theorem exists_last_edge : ∀ {u w : Vertex verts} (p : Path g u w), 0 < p.length →
+    ∃ x, x ∈ p.vertices ∧ g.Edge x w := by
+  intro u w p
+  induction p with
+  | nil v => intro h; simp [length] at h
+  | @cons a b c hedge p' ih =>
+    intro _
+    rcases Nat.eq_zero_or_pos p'.length with h0 | hpos
+    · have hbc : b = c := eq_of_length_zero p' h0
+      subst hbc
+      exact ⟨a, by simp [vertices], hedge⟩
+    · obtain ⟨x, hxmem, hxe⟩ := ih hpos
+      exact ⟨x, by simp [vertices, hxmem], hxe⟩
 
 end Path
 

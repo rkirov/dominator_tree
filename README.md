@@ -29,8 +29,10 @@ tree.
 - `DepGraph.dominates_dist_le` / `dominates_dist_lt` — a dominator is never
   further from the root, and a strict dominator is strictly closer.
 - `DepGraph.Reducible` — every cycle has a header dominating all of it — with
-  `TwoEntryLoop.not_reducible` exhibiting the smallest irreducible graph, a
-  loop entered at two places.
+  `forwardAcyclic_of_reducible` proving a reducible graph loses every cycle
+  when back edges are deleted, and `TwoEntryLoop.not_reducible` exhibiting the
+  smallest irreducible graph, a loop entered at two places. The converse
+  (Hecht–Ullman) is not proved.
 
 Everything is proved: no `sorry`, no custom axioms. Some results use
 `Classical.choice`, which enters through choosing a least path length.

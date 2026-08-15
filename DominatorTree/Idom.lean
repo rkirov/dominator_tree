@@ -59,7 +59,7 @@ theorem exists_isIdom (g : ConnectedGraph verts) (v : Vertex verts) (hv : v ≠ 
   intro hwP
   -- cut a shortest path to `v` at `u`
   obtain ⟨S, hS⟩ := (g.isDist_dist v).1
-  obtain ⟨Q, R, hQR⟩ := S.exists_split u (hu.1 S)
+  obtain ⟨Q, R, hQR, -, -⟩ := S.exists_split u (hu.1 S)
   have hQ : g.dist u ≤ Q.length := (g.isDist_dist u).2 Q
   have hRlow : g.dist v ≤ g.dist u + R.length := by
     obtain ⟨Su, hSu⟩ := (g.isDist_dist u).1
@@ -69,7 +69,7 @@ theorem exists_isIdom (g : ConnectedGraph verts) (v : Vertex verts) (hv : v ≠ 
   -- `w` cannot lie on the second half
   have hwR : w ∉ R.vertices := by
     intro hmem
-    obtain ⟨R1, R2, hR⟩ := R.exists_split w hmem
+    obtain ⟨R1, R2, hR, -, -⟩ := R.exists_split w hmem
     have h1 : g.dist w ≤ Q.length + R1.length := by
       have hle := (g.isDist_dist w).2 (Q.append R1)
       simpa using hle

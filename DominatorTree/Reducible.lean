@@ -29,7 +29,14 @@ noncomputable def forward (g : DepGraph verts) : DepGraph verts where
 /-- The other standard characterisation of reducibility: deleting the back
 edges leaves a directed acyclic graph, i.e. every cycle uses a back edge.
 
-Known to be equivalent to `Reducible`; that equivalence is not proved here. -/
+`forwardAcyclic_of_reducible` proves one direction. The converse — the
+Hecht–Ullman theorem — is not proved here, and is harder than it looks: knowing
+a cycle contains *some* back edge `x → h` does not make `h` a header. In nested
+loops with outer header `1` and inner header `2`, the cycle through both
+contains the inner back edge, yet `2` does not dominate `1`. The header is
+instead the vertex of the cycle closest to the root — necessarily unique, since
+strict dominance strictly decreases distance — but identifying it needs a
+topological order on `forward`, which `Acyclic` does not directly supply. -/
 def ForwardAcyclic (g : DepGraph verts) : Prop :=
   (g.forward).Acyclic
 
@@ -50,6 +57,43 @@ def forwardPath {g : DepGraph verts} :
   induction p with
   | nil _ => rfl
   | cons _ _ ih => simp [forwardPath, Path.length, ih]
+
+theorem mem_forward_out {g : DepGraph verts} {v w : Vertex verts} :
+    w ∈ (g.forward).out v ↔ w ∈ g.out v ∧ ¬ g.Dominates w v := by
+  simp [forward, List.mem_filter]
+
+@[simp] theorem vertices_forwardPath {g : DepGraph verts} :
+    ∀ {u w : Vertex verts} (p : Path (g.forward) u w),
+      (forwardPath p).vertices = p.vertices := by
+  intro u w p
+  induction p with
+  | nil _ => rfl
+  | cons _ _ ih => simp [forwardPath, Path.vertices, ih]
+
+/-- A reducible graph loses all its cycles when back edges are deleted.
+
+A cycle surviving in `forward` would still have a header `h` dominating it, and
+the cycle's own edge into `h` would then be a back edge — but back edges are
+exactly what `forward` removed. -/
+theorem forwardAcyclic_of_reducible {g : DepGraph verts} (hred : g.Reducible) :
+    g.ForwardAcyclic := by
+  intro v p
+  rcases Nat.eq_zero_or_pos p.length with h0 | hpos
+  · exact h0
+  · exfalso
+    -- the same cycle in `g` has a header dominating all of it
+    have hgp : 0 < (forwardPath p).length := by simpa using hpos
+    obtain ⟨hd, hdmem, hdall⟩ := hred v (forwardPath p) hgp
+    rw [vertices_forwardPath] at hdmem hdall
+    -- cut the cycle at the header and take the edge arriving there
+    obtain ⟨q, r, hlen, hqv, hrv⟩ := p.exists_split hd hdmem
+    rcases Nat.eq_zero_or_pos q.length with hq0 | hqpos
+    · have hvhd : v = hd := Path.eq_of_length_zero q hq0
+      subst hvhd
+      obtain ⟨x, hxmem, hxe⟩ := r.exists_last_edge (by omega)
+      exact (mem_forward_out.mp hxe).2 (hdall x (hrv x hxmem))
+    · obtain ⟨x, hxmem, hxe⟩ := q.exists_last_edge hqpos
+      exact (mem_forward_out.mp hxe).2 (hdall x (hqv x hxmem))
 
 /-- An acyclic graph is reducible: there are no cycles to control. -/
 theorem reducible_of_acyclic {g : DepGraph verts} (h : g.Acyclic) : g.Reducible := by
