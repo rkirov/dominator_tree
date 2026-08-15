@@ -41,14 +41,31 @@ Everything is proved: no `sorry`, no custom axioms. Some results use
 - Acyclicity is defined as "the only path from a vertex to itself is empty", and
   proved from a rank that decreases along edges (`DepGraph.Ranked.acyclic`).
 
-## Not done yet
+## Next steps
 
 `domTree` is noncomputable — it is the mathematical object, not an algorithm.
-Making it computable means implementing a dominator algorithm and proving it
-meets this specification. The cheapest route is Purdom–Moore: `u` dominates `v`
-exactly when deleting `u` makes `v` unreachable, so a reachability search per
-vertex decides dominance, and the immediate dominator is then read off directly
-from the definition.
+What is here is the specification an implementation has to meet.
+
+The next step is to write the three known dominator algorithms and prove each
+correct against that specification, in increasing order of both speed and
+difficulty.
+
+- **Purdom–Moore**, `O(n·(n+m))`. `u` dominates `v` exactly when deleting `u`
+  makes `v` unreachable, so one reachability search per vertex decides
+  dominance, and the immediate dominator is read straight off the definition of
+  `IsIdom`. Cheapest to verify: the algorithm mirrors the existing proof, and
+  the only real obligation is that the search agrees with `Dominates`.
+- **Cooper–Harvey–Kennedy**, iterative dataflow. Fast in practice and the usual
+  choice in compilers. Needs predecessors, which this representation does not
+  store, and a vertex numbering in which every dominator has a smaller index —
+  `dominates_dist_lt` supplies one. Verifying it means proving the dataflow
+  equation `dom(v) = {v} ∪ ⋂ dom(preds v)` characterises path dominance, and
+  that the iteration reaches that fixpoint.
+- **Lengauer–Tarjan**, near-linear. Semidominators are defined relative to a DFS
+  tree, so this needs DFS and its numbering first. By far the largest proof.
+
+Proving the first would already give a computable dominator tree; the other two
+are then refinements that can be checked against it.
 
 ## Build
 
