@@ -15,6 +15,7 @@ tree.
 | `Dist.lean` | shortest-path distance `IsDist`, dominance ordering, antisymmetry |
 | `Idom.lean` | existence of immediate dominators |
 | `Tree.lean` | `Tree`, acyclicity, the dominator tree |
+| `Reducible.lean` | back edges, reducibility, and an irreducible example |
 
 ## Main results
 
@@ -27,6 +28,9 @@ tree.
   `domTree_exists_path_to_root` that following parents reaches the root.
 - `DepGraph.dominates_dist_le` / `dominates_dist_lt` — a dominator is never
   further from the root, and a strict dominator is strictly closer.
+- `DepGraph.Reducible` — every cycle has a header dominating all of it — with
+  `TwoEntryLoop.not_reducible` exhibiting the smallest irreducible graph, a
+  loop entered at two places.
 
 Everything is proved: no `sorry`, no custom axioms. Some results use
 `Classical.choice`, which enters through choosing a least path length.
