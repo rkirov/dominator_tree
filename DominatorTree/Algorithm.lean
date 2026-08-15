@@ -61,6 +61,23 @@ theorem rank_lt_of_dominates {g : ConnectedGraph verts} {rank : Vertex verts →
   have hle := topoRank_add_le htopo R
   omega
 
+/-- A connected graph together with a topological rank: the input the algorithm
+is verified against.
+
+The computation itself needs only a `DepGraph` and a rank — connectivity is what
+makes the *answers* meaningful, so it is bundled here rather than demanded to
+run the algorithm. -/
+structure RankedGraph {V : Type} (verts : List V) where
+  /-- The graph. -/
+  graph : ConnectedGraph verts
+  /-- A topological numbering of it. -/
+  rank : Vertex verts → Nat
+  /-- The numbering increases along every edge. -/
+  topo : graph.toDepGraph.TopoRank rank
+
+/-- The underlying graph, forgetting connectivity. -/
+abbrev RankedGraph.dep {verts : List V} (R : RankedGraph verts) : DepGraph verts := R.graph.toDepGraph
+
 variable [DecidableEq V] [Hashable V]
 
 /-- The predecessors of `v`. -/
@@ -168,43 +185,43 @@ termination_by qs => qs.length
 
 /-- A table is correct below `B` when it gives the immediate dominator of every
 vertex of smaller rank. -/
-def Correct {rank : Vertex verts → Nat} (g : ConnectedGraph verts) (tbl : Table verts rank)
-    (B : Nat) : Prop :=
-  ∀ x, rank x < B →
-    (∀ u hu, tbl.get x = some ⟨u, hu⟩ → g.IsIdom u x) ∧ (x ≠ g.root → (tbl.get x).isSome)
+def Correct (R : RankedGraph verts) (tbl : Table verts R.rank) (B : Nat) : Prop :=
+  ∀ x, R.rank x < B →
+    (∀ u hu, tbl.get x = some ⟨u, hu⟩ → R.graph.IsIdom u x) ∧
+      (x ≠ R.graph.root → (tbl.get x).isSome)
 
 /-- `m` is the deepest common dominator of `a` and `b`. -/
-def IsGCD (g : ConnectedGraph verts) (m a b : Vertex verts) : Prop :=
-  g.Dominates m a ∧ g.Dominates m b ∧ ∀ w, g.Dominates w a → g.Dominates w b → g.Dominates w m
+def IsGCD (R : RankedGraph verts) (m a b : Vertex verts) : Prop :=
+  R.graph.Dominates m a ∧ R.graph.Dominates m b ∧
+    ∀ w, R.graph.Dominates w a → R.graph.Dominates w b → R.graph.Dominates w m
 
-theorem IsGCD.symm {g : ConnectedGraph verts} {m a b : Vertex verts} (h : IsGCD g m a b) :
-    IsGCD g m b a :=
+theorem IsGCD.symm {R : RankedGraph verts} {m a b : Vertex verts} (h : IsGCD R m a b) :
+    IsGCD R m b a :=
   ⟨h.2.1, h.1, fun w hwb hwa => h.2.2 w hwa hwb⟩
 
 /-- Replacing `a` by its parent preserves the deepest common dominator, provided
 no common dominator of `a` and `b` is `a` itself: such a dominator is then a
 *strict* dominator of `a`, so it dominates `a`'s parent. -/
-theorem IsGCD.step {g : ConnectedGraph verts} {m a b a' : Vertex verts} (hidom : g.IsIdom a' a)
-    (hne : ∀ w, g.Dominates w a → g.Dominates w b → w ≠ a) (h : IsGCD g m a' b) :
-    IsGCD g m a b :=
+theorem IsGCD.step {R : RankedGraph verts} {m a b a' : Vertex verts} (hidom : R.graph.IsIdom a' a)
+    (hne : ∀ w, R.graph.Dominates w a → R.graph.Dominates w b → w ≠ a) (h : IsGCD R m a' b) :
+    IsGCD R m a b :=
   ⟨h.1.trans hidom.1.1, h.2.1,
     fun w hwa hwb => h.2.2 w (hidom.2 w ⟨hwa, hne w hwa hwb⟩) hwb⟩
 
 /-- The climb returns the deepest common dominator of `a` and `b`. -/
-theorem lca_spec {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
-    (htopo : g.toDepGraph.TopoRank rank) {B : Nat} {tbl : Table verts rank}
-    (hok : Correct g tbl B) :
-    ∀ (n : Nat) (a b : Vertex verts), rank a < B → rank b < B → rank a + rank b = n →
-      ∃ m, lca tbl a b = some m ∧ rank m ≤ rank a ∧ IsGCD g m a b := by
+theorem lca_spec (R : RankedGraph verts) {B : Nat} {tbl : Table verts R.rank}
+    (hok : Correct R tbl B) :
+    ∀ (n : Nat) (a b : Vertex verts), R.rank a < B → R.rank b < B → R.rank a + R.rank b = n →
+      ∃ m, lca tbl a b = some m ∧ R.rank m ≤ R.rank a ∧ IsGCD R m a b := by
   -- the deeper of two distinct vertices is not the root, so it has a parent
-  have parent : ∀ c d : Vertex verts, rank c < B → rank d ≤ rank c → c ≠ d →
-      ∃ c' h', tbl.get c = some ⟨c', h'⟩ ∧ g.IsIdom c' c := by
+  have parent : ∀ c d : Vertex verts, R.rank c < B → R.rank d ≤ R.rank c → c ≠ d →
+      ∃ c' h', tbl.get c = some ⟨c', h'⟩ ∧ R.graph.IsIdom c' c := by
     intro c d hc hle hcd
-    have hcroot : c ≠ g.root := by
+    have hcroot : c ≠ R.graph.root := by
       rintro rfl
-      by_cases hdr : d = g.root
+      by_cases hdr : d = R.graph.root
       · exact hcd hdr.symm
-      · have := rank_lt_of_dominates htopo (g.root_dominates d) (Ne.symm hdr)
+      · have := rank_lt_of_dominates R.topo (R.graph.root_dominates d) (Ne.symm hdr)
         omega
     cases hpc : tbl.get c with
     | none => exact absurd ((hok c hc).2 hcroot) (by rw [hpc]; simp)
@@ -212,10 +229,10 @@ theorem lca_spec {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
       obtain ⟨c', h'⟩ := val
       exact ⟨c', h', rfl, (hok c hc).1 c' h' hpc⟩
   -- no common dominator of two distinct vertices is the deeper one
-  have notDeeper : ∀ c d w : Vertex verts, rank d ≤ rank c → c ≠ d →
-      g.Dominates w c → g.Dominates w d → w ≠ c := by
+  have notDeeper : ∀ c d w : Vertex verts, R.rank d ≤ R.rank c → c ≠ d →
+      R.graph.Dominates w c → R.graph.Dominates w d → w ≠ c := by
     rintro c d w hle hcd _ hwd rfl
-    exact absurd (rank_lt_of_dominates htopo hwd hcd) (by omega)
+    exact absurd (rank_lt_of_dominates R.topo hwd hcd) (by omega)
   intro n
   induction n using Nat.strongRecOn with
   | ind n ih =>
@@ -224,41 +241,40 @@ theorem lca_spec {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
     by_cases hab : a = b
     · subst hab
       exact ⟨a, by simp, Nat.le_refl _,
-        g.dominates_refl a, g.dominates_refl a, fun w hw _ => hw⟩
+        R.graph.dominates_refl a, R.graph.dominates_refl a, fun w hw _ => hw⟩
     · rw [if_neg hab]
-      by_cases hlt : rank b < rank a
+      by_cases hlt : R.rank b < R.rank a
       · rw [if_pos hlt]
         obtain ⟨a', h', hpa, hidom⟩ := parent a b ha (by omega) hab
         rw [hpa]
         obtain ⟨m, hlca, hmle, hgcd⟩ :=
-          ih (rank a' + rank b) (by omega) a' b (by omega) hb rfl
+          ih (R.rank a' + R.rank b) (by omega) a' b (by omega) hb rfl
         exact ⟨m, hlca, by omega, hgcd.step hidom (notDeeper a b · (by omega) hab)⟩
       · rw [if_neg hlt]
         obtain ⟨b', h', hpb, hidom⟩ := parent b a hb (by omega) (fun h => hab h.symm)
         rw [hpb]
         obtain ⟨m, hlca, hmle, hgcd⟩ :=
-          ih (rank a + rank b') (by omega) a b' ha (by omega) rfl
+          ih (R.rank a + R.rank b') (by omega) a b' ha (by omega) rfl
         refine ⟨m, hlca, hmle, ?_⟩
         exact (hgcd.symm.step hidom
           (notDeeper b a · (by omega) (fun h => hab h.symm))).symm
 
 /-- The deepest common dominator of a non-empty list. -/
-theorem lcaOf_spec {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
-    (htopo : g.toDepGraph.TopoRank rank) {B : Nat} {tbl : Table verts rank}
-    (hok : Correct g tbl B) :
-    ∀ (n : Nat) (qs : List (Vertex verts)), qs.length = n → qs ≠ [] → (∀ q ∈ qs, rank q < B) →
-      ∃ m, lcaOf tbl qs = some m ∧ (∃ q ∈ qs, rank m ≤ rank q) ∧
-        (∀ q ∈ qs, g.Dominates m q) ∧ ∀ w, (∀ q ∈ qs, g.Dominates w q) → g.Dominates w m := by
+theorem lcaOf_spec (R : RankedGraph verts) {B : Nat} {tbl : Table verts R.rank}
+    (hok : Correct R tbl B) :
+    ∀ (n : Nat) (qs : List (Vertex verts)), qs.length = n → qs ≠ [] → (∀ q ∈ qs, R.rank q < B) →
+      ∃ m, lcaOf tbl qs = some m ∧ (∃ q ∈ qs, R.rank m ≤ R.rank q) ∧
+        (∀ q ∈ qs, R.graph.Dominates m q) ∧ ∀ w, (∀ q ∈ qs, R.graph.Dominates w q) → R.graph.Dominates w m := by
   intro n
   induction n using Nat.strongRecOn with
   | ind n ih =>
     rintro (_ | ⟨p, _ | ⟨q, qs⟩⟩) hlen hne hq
     · exact absurd rfl hne
-    · exact ⟨p, by rw [lcaOf], ⟨p, by simp, Nat.le_refl _⟩, by simp [g.dominates_refl],
+    · exact ⟨p, by rw [lcaOf], ⟨p, by simp, Nat.le_refl _⟩, by simp [R.graph.dominates_refl],
         fun w hw => hw p (by simp)⟩
     · rw [lcaOf]
       obtain ⟨m₁, hlca, hm₁le, hgcd⟩ :=
-        lca_spec htopo hok _ p q (hq p (by simp)) (hq q (by simp)) rfl
+        lca_spec R hok _ p q (hq p (by simp)) (hq q (by simp)) rfl
       rw [hlca]
       obtain ⟨m, heq, ⟨r, hr, hmr⟩, hall, huniv⟩ :=
         ih (qs.length + 1) (by simp at hlen; omega) (m₁ :: qs) (by simp) (by simp)
@@ -267,7 +283,7 @@ theorem lcaOf_spec {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
             rcases List.mem_cons.mp hx with rfl | hx'
             · exact Nat.lt_of_le_of_lt hm₁le (hq p (by simp))
             · exact hq x (by simp [hx']))
-      have hmm₁ : g.Dominates m m₁ := hall m₁ (by simp)
+      have hmm₁ : R.graph.Dominates m m₁ := hall m₁ (by simp)
       refine ⟨m, heq, ?_, ?_, fun w hw => huniv w ?_⟩
       · rcases List.mem_cons.mp hr with rfl | hr'
         · exact ⟨p, by simp, Nat.le_trans hmr hm₁le⟩
@@ -294,23 +310,22 @@ def parentOf (g : DepGraph verts) (rank : Vertex verts → Nat) (tbl : Table ver
 
 /-- `parentOf` returns the immediate dominator, and returns one whenever the
 vertex has a parent to find. -/
-theorem parentOf_spec {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
-    (htopo : g.toDepGraph.TopoRank rank) {tbl : Table verts rank} {v : Vertex verts}
-    (hok : Correct g tbl (rank v)) :
-    (∀ u hu, parentOf g.toDepGraph rank tbl v = some ⟨u, hu⟩ → g.IsIdom u v) ∧
-      (v ≠ g.root → (parentOf g.toDepGraph rank tbl v).isSome) := by
+theorem parentOf_spec (R : RankedGraph verts) {tbl : Table verts R.rank} {v : Vertex verts}
+    (hok : Correct R tbl (R.rank v)) :
+    (∀ u hu, parentOf R.dep R.rank tbl v = some ⟨u, hu⟩ → R.graph.IsIdom u v) ∧
+      (v ≠ R.graph.root → (parentOf R.dep R.rank tbl v).isSome) := by
   rw [parentOf]
-  by_cases hroot : v = g.root
+  by_cases hroot : v = R.graph.root
   · rw [if_pos hroot]
     exact ⟨by simp, fun h => absurd hroot h⟩
   · rw [if_neg hroot]
     obtain ⟨m, heq, ⟨q₀, hq₀, hmle⟩, hmall, huniv⟩ :=
-      lcaOf_spec htopo hok _ (g.preds v) rfl (preds_ne_nil hroot)
-        (fun q hq => htopo q v (mem_preds.mp hq))
-    have hmv : g.Dominates m v :=
+      lcaOf_spec R hok _ (R.graph.preds v) rfl (preds_ne_nil hroot)
+        (fun q hq => R.topo q v (mem_preds.mp hq))
+    have hmv : R.graph.Dominates m v :=
       (dominates_iff_preds hroot m).mpr (Or.inr fun q hq => hmall q (mem_preds.mpr hq))
-    have hmlt : rank m < rank v :=
-      Nat.lt_of_le_of_lt hmle (htopo q₀ v (mem_preds.mp hq₀))
+    have hmlt : R.rank m < R.rank v :=
+      Nat.lt_of_le_of_lt hmle (R.topo q₀ v (mem_preds.mp hq₀))
     rw [heq]
     dsimp only
     rw [dif_pos hmlt]
@@ -369,20 +384,19 @@ def buildUpTo (g : DepGraph verts) (rank : Vertex verts → Nat) : Nat → Table
 
 /-- **Correctness of the construction**: after building up to `n`, the table
 holds the immediate dominator of every vertex of rank below `n`. -/
-theorem buildUpTo_correct {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
-    (htopo : g.toDepGraph.TopoRank rank) :
-    ∀ n : Nat, Correct g (buildUpTo g.toDepGraph rank n) n := by
+theorem buildUpTo_correct (R : RankedGraph verts) :
+    ∀ n : Nat, Correct R (buildUpTo R.dep R.rank n) n := by
   intro n
   induction n with
   | zero => intro x hx; omega
   | succ n ih =>
     intro x hx
     rw [buildUpTo, get_insertAll]
-    rcases Nat.lt_or_ge (rank x) n with h | h
+    rcases Nat.lt_or_ge (R.rank x) n with h | h
     · rw [if_neg (by simp; omega)]
       exact ih x h
     · rw [if_pos (by simp; omega)]
-      exact parentOf_spec htopo (by rwa [show rank x = n by omega])
+      exact parentOf_spec R (by rwa [show R.rank x = n by omega])
 
 /-- The dominator tree: the parent of `v`, or `none` at the root. -/
 def idom? (g : DepGraph verts) (rank : Vertex verts → Nat) (N : Nat) (v : Vertex verts) :
@@ -390,25 +404,23 @@ def idom? (g : DepGraph verts) (rank : Vertex verts → Nat) (N : Nat) (v : Vert
   ((buildUpTo g rank N).get v).map Subtype.val
 
 /-- **Soundness**: what `idom?` returns is the immediate dominator. -/
-theorem isIdom_of_idom? {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
-    (htopo : g.toDepGraph.TopoRank rank) {N : Nat} {v u : Vertex verts} (hN : rank v < N)
-    (h : idom? g.toDepGraph rank N v = some u) : g.IsIdom u v := by
+theorem isIdom_of_idom? (R : RankedGraph verts) {N : Nat} {v u : Vertex verts} (hN : R.rank v < N)
+    (h : idom? R.dep R.rank N v = some u) : R.graph.IsIdom u v := by
   rw [idom?] at h
-  cases h' : (buildUpTo g.toDepGraph rank N).get v with
+  cases h' : (buildUpTo R.dep R.rank N).get v with
   | none => rw [h'] at h; simp at h
   | some val =>
     obtain ⟨u', hu'⟩ := val
     rw [h'] at h
     simp only [Option.map_some, Option.some.injEq] at h
     subst h
-    exact (buildUpTo_correct htopo N v hN).1 u' hu' h'
+    exact (buildUpTo_correct R N v hN).1 u' hu' h'
 
 /-- **Totality**: on a connected graph every non-root vertex gets a parent. -/
-theorem idom?_isSome {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
-    (htopo : g.toDepGraph.TopoRank rank) {N : Nat} {v : Vertex verts} (hN : rank v < N)
-    (hv : v ≠ g.root) : (idom? g.toDepGraph rank N v).isSome := by
+theorem idom?_isSome (R : RankedGraph verts) {N : Nat} {v : Vertex verts} (hN : R.rank v < N)
+    (hv : v ≠ R.graph.root) : (idom? R.dep R.rank N v).isSome := by
   rw [idom?, Option.isSome_map]
-  exact (buildUpTo_correct htopo N v hN).2 hv
+  exact (buildUpTo_correct R N v hN).2 hv
 
 /-- Is `u` on the path from `v` to the root of the dominator tree?
 
@@ -428,10 +440,10 @@ One way it is transitivity — the parent dominates `v`, so anything dominating
 the parent dominates `v`. The other way it is the defining property of an
 immediate dominator: every strict dominator of `v` also dominates `v`'s
 parent. -/
-theorem domWalk_iff {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
-    {N : Nat} {tbl : Table verts rank} (hok : Correct g tbl N) :
-    ∀ (n : Nat) (v : Vertex verts), rank v = n → rank v < N → ∀ u : Vertex verts,
-      domWalk tbl u v = true ↔ g.Dominates u v := by
+theorem domWalk_iff (R : RankedGraph verts) {N : Nat} {tbl : Table verts R.rank}
+    (hok : Correct R tbl N) :
+    ∀ (n : Nat) (v : Vertex verts), R.rank v = n → R.rank v < N → ∀ u : Vertex verts,
+      domWalk tbl u v = true ↔ R.graph.Dominates u v := by
   intro n
   induction n using Nat.strongRecOn with
   | ind n ih =>
@@ -439,11 +451,11 @@ theorem domWalk_iff {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
     rw [domWalk]
     by_cases huv : u = v
     · subst huv
-      simp [g.dominates_refl u]
+      simp [R.graph.dominates_refl u]
     · rw [if_neg huv]
       cases h : tbl.get v with
       | none =>
-        have hroot : v = g.root := by
+        have hroot : v = R.graph.root := by
           apply Classical.byContradiction
           intro hne
           have hsome := (hok v hvN).2 hne
@@ -454,8 +466,8 @@ theorem domWalk_iff {g : ConnectedGraph verts} {rank : Vertex verts → Nat}
         exact ⟨fun hf => absurd hf (by simp), fun hu => absurd hu huv⟩
       | some val =>
         obtain ⟨m, hm⟩ := val
-        have hidom : g.IsIdom m v := (hok v hvN).1 m hm h
-        rw [ih (rank m) (by omega) m rfl (by omega) u]
+        have hidom : R.graph.IsIdom m v := (hok v hvN).1 m hm h
+        rw [ih (R.rank m) (by omega) m rfl (by omega) u]
         exact ⟨fun hum => hum.trans hidom.1.1, fun huv' => hidom.2 u ⟨huv', huv⟩⟩
 
 end DepGraph
