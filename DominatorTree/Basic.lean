@@ -222,6 +222,44 @@ theorem Dominates.trans {g : DepGraph verts} {u w v : Vertex verts}
   obtain ⟨Q, -, -, hQv, -⟩ := P.exists_split w (hwv P)
   exact hQv u (huw Q)
 
+/-- Only the root dominates the root. -/
+theorem dominates_root_iff {g : DepGraph verts} {w : Vertex verts} :
+    g.Dominates w g.root ↔ w = g.root := by
+  constructor
+  · intro h
+    have := h (.nil _)
+    simpa [Path.vertices] using this
+  · rintro rfl
+    exact g.dominates_refl _
+
+/-- The dataflow equation: `w` dominates `v` exactly when it is `v`, or
+dominates every predecessor of `v`. Extending a path to a predecessor by one
+edge adds only `v` itself, and conversely every path to a non-root `v` ends with
+an edge from a predecessor. -/
+theorem dominates_iff_preds {g : DepGraph verts} {v : Vertex verts} (hv : v ≠ g.root)
+    (w : Vertex verts) :
+    g.Dominates w v ↔ (w = v ∨ ∀ p, g.Edge p v → g.Dominates w p) := by
+  constructor
+  · intro hdom
+    by_cases hwv : w = v
+    · exact Or.inl hwv
+    refine Or.inr fun p hp P => ?_
+    have hmem := hdom (P.append (.cons hp (.nil v)))
+    rcases Path.mem_vertices_append P _ hmem with h | h
+    · exact h
+    · simp [Path.vertices] at h
+      rcases h with rfl | rfl
+      · exact P.end_mem_vertices
+      · exact absurd rfl hwv
+  · rintro (rfl | hall) P
+    · exact P.end_mem_vertices
+    · have hpos : 0 < P.length := by
+        rcases Nat.eq_zero_or_pos P.length with h0 | h
+        · exact absurd (Path.eq_of_length_zero P h0).symm hv
+        · exact h
+      obtain ⟨x, q, he, hqv⟩ := P.exists_last_edge_path hpos
+      exact hqv w (hall x he q)
+
 /-- A vertex unreachable from the root is dominated by everything, vacuously.
 
 So the dominator relation is a tree only on the reachable vertices. -/

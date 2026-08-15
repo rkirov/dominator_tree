@@ -33,7 +33,9 @@ tree.
   topological rank (a DAG, or a reducible graph's forward part), proved sound
   (`isIdom_of_idom?`) and, on a connected graph, total (`idom?_isSome`). It rests
   on `dominates_iff_preds`, the dataflow equation `dom v = {v} ∪ ⋂ dom (preds v)`,
-  derived here directly from paths.
+  derived directly from paths. No dominator sets are formed: each vertex's tree
+  path is built by intersecting its predecessors' paths, so the lists are only
+  as long as the tree is deep.
 - `DepGraph.domWalk` — dominance is not stored but recomputed by climbing that
   tree, and `domWalk_iff` proves the climb decides it. Its own termination
   relies on the tree's parents having smaller rank, so the theory is what makes
@@ -67,9 +69,9 @@ an algorithm. `Algorithm.lean` closes part of that gap: `idom?` computes the
 tree in one pass, verified against this specification, for any graph supplied
 with a topological rank. Two limits remain. The rank has to be given by the
 caller, because deriving one from acyclicity is a topological sort we have not
-formalised. And `idom?` still materialises dominator sets on the way to the tree, so it is
-`O(n²)`; the textbook `O(n·depth)` version computes each parent as the nearest
-common ancestor of the predecessors, never building a set at all.
+formalised. And the tree paths are intersected by filtering rather than by climbing two
+pointers, so building the tree costs `O(m · depth²)` where the textbook
+version is `O(m · depth)`.
 
 For graphs with no topological rank — irreducible ones — the remaining
 algorithms are, in increasing order of both speed and difficulty:
