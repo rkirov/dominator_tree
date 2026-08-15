@@ -1,0 +1,6 @@
+name = "dominator_tree"
+version = "0.1.0"
+defaultTargets = ["DominatorTree"]
+
+[[lean_lib]]
+name = "DominatorTree"
