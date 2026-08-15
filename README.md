@@ -74,10 +74,11 @@ parent is stored in a `Table`, so every parent is computed exactly once. The
 climb terminates by typing rather than by an invariant — the table hands back
 `{u // rank u < rank v}`, so the recursion measure falls out of the result type.
 
-The `Table` must be data, not a function: a function-valued table is a partial
-application that recomputes the whole construction on every lookup, which costs
-an exponential blow-up. Only `Table.get`, `Table.insert` and two lemmas about
-them touch the representation.
+The `Table` is a `Std.HashMap` — and it must be data, not a function: a
+function-valued table is a partial application that recomputes the whole
+construction on every lookup, which costs an exponential blow-up. Only
+`Table.get`, `Table.insert` and two lemmas about them touch the
+representation.
 
 For graphs with no topological rank — irreducible ones — the remaining
 algorithms are, in increasing order of both speed and difficulty:

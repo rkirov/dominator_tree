@@ -1,4 +1,5 @@
 import DominatorTree.Reducible
+import Std.Data.HashMap
 
 /-!
 # Computing the dominator tree
@@ -60,16 +61,18 @@ theorem rank_lt_of_dominates {g : ConnectedGraph verts} {rank : Vertex verts →
   have hle := topoRank_add_le htopo R
   omega
 
-variable [DecidableEq V]
+variable [DecidableEq V] [Hashable V]
 
 /-- The predecessors of `v`. -/
 def preds (g : DepGraph verts) (v : Vertex verts) : List (Vertex verts) :=
   verts.attach.filter (fun u => decide (v ∈ g.out u))
 
+omit [Hashable V] in
 @[simp] theorem mem_preds {g : DepGraph verts} {u v : Vertex verts} :
     u ∈ g.preds v ↔ g.Edge u v := by
   simp [preds, List.mem_filter, List.mem_attach, Edge]
 
+omit [Hashable V] in
 /-- On a connected graph every non-root vertex has a predecessor. -/
 theorem preds_ne_nil {g : ConnectedGraph verts} {v : Vertex verts} (hv : v ≠ g.root) :
     g.preds v ≠ [] := by
@@ -84,15 +87,21 @@ theorem preds_ne_nil {g : ConnectedGraph verts} {v : Vertex verts} (hv : v ≠ g
   rw [hnil] at this
   simp at this
 
-/-- A dominator tree under construction: recorded parents, newest first.
+/-- Vertices hash by their label. -/
+instance instHashableVertex [Hashable V] : Hashable (Vertex verts) := ⟨fun v => hash v.val⟩
 
-Real data, not a function — a function-valued table would be a partial
-application that recomputes on every lookup. -/
-abbrev Table (verts : List V) (rank : Vertex verts → Nat) : Type :=
-  List (Vertex verts × Option (Vertex verts))
+instance [Hashable V] : LawfulHashable (Vertex verts) where
+  hash_eq a b h := by
+    have hab : a = b := Subtype.ext (by simpa using h)
+    rw [hab]
+
+/-- A dominator tree under construction: a map from each processed vertex to its
+parent, or to `none` at the root. -/
+abbrev Table (verts : List V) (_rank : Vertex verts → Nat) : Type :=
+  Std.HashMap (Vertex verts) (Option (Vertex verts))
 
 /-- The empty tree. -/
-def Table.empty {rank : Vertex verts → Nat} : Table verts rank := []
+def Table.empty {rank : Vertex verts → Nat} : Table verts rank := ∅
 
 /-- The recorded parent of `v`, paired with the proof that its rank dropped —
 recovered by a check, which the correctness invariant shows always passes.
@@ -100,24 +109,20 @@ recovered by a check, which the correctness invariant shows always passes.
 The proof is what makes climbing the tree terminate. -/
 def Table.get {rank : Vertex verts → Nat} (tbl : Table verts rank) (v : Vertex verts) :
     Option {u : Vertex verts // rank u < rank v} :=
-  match List.find? (fun e => decide (e.1 = v)) tbl with
+  match tbl[v]? with
   | none => none
-  | some e =>
-      match e.2 with
-      | none => none
-      | some u => if h : rank u < rank v then some ⟨u, h⟩ else none
+  | some none => none
+  | some (some u) => if h : rank u < rank v then some ⟨u, h⟩ else none
 
 /-- Record the parent of `v`. -/
 def Table.insert {rank : Vertex verts → Nat} (tbl : Table verts rank) (v : Vertex verts)
     (p : Option {u : Vertex verts // rank u < rank v}) : Table verts rank :=
-  (v, p.map Subtype.val) :: tbl
+  Std.HashMap.insert tbl v (p.map Subtype.val)
 
 @[simp] theorem Table.get_insert_self {rank : Vertex verts → Nat} (tbl : Table verts rank)
     (v : Vertex verts) (p : Option {u : Vertex verts // rank u < rank v}) :
     (tbl.insert v p).get v = p := by
-  have hfind : List.find? (fun e => decide (e.1 = v)) (tbl.insert v p)
-      = some (v, p.map Subtype.val) := by simp [Table.insert]
-  simp only [Table.get, hfind]
+  simp only [Table.get, Table.insert, Std.HashMap.getElem?_insert_self]
   cases p with
   | none => rfl
   | some u =>
@@ -127,10 +132,8 @@ def Table.insert {rank : Vertex verts → Nat} (tbl : Table verts rank) (v : Ver
 theorem Table.get_insert_ne {rank : Vertex verts → Nat} (tbl : Table verts rank)
     {v x : Vertex verts} (p : Option {u : Vertex verts // rank u < rank v}) (h : x ≠ v) :
     (tbl.insert v p).get x = tbl.get x := by
-  have hfind : List.find? (fun e => decide (e.1 = x)) (tbl.insert v p)
-      = List.find? (fun e => decide (e.1 = x)) tbl := by
-    simp [Table.insert, Ne.symm h]
-  simp only [Table.get, hfind]
+  have hne : (v == x) ≠ true := fun hh => h (eq_of_beq hh).symm
+  simp only [Table.get, Table.insert, Std.HashMap.getElem?_insert, if_neg hne]
 
 /-- Climb `a` and `b` to their lowest common ancestor.
 
@@ -327,6 +330,7 @@ def levelStep (g : DepGraph verts) (rank : Vertex verts → Nat) (tbl : Table ve
 def atRank (rank : Vertex verts → Nat) (n : Nat) : List (Vertex verts) :=
   verts.attach.filter (fun v => decide (rank v = n))
 
+omit [DecidableEq V] [Hashable V] in
 theorem mem_atRank {rank : Vertex verts → Nat} {n : Nat} {v : Vertex verts} :
     v ∈ atRank rank n ↔ rank v = n := by
   simp [atRank, List.mem_filter, List.mem_attach]
