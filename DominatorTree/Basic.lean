@@ -214,6 +214,14 @@ theorem dominates_refl (g : DepGraph verts) (v : Vertex verts) : g.Dominates v v
 theorem root_dominates (g : DepGraph verts) (v : Vertex verts) : g.Dominates g.root v :=
   fun p => p.start_mem_vertices
 
+/-- Dominance is transitive: cut a path to `v` at `w`, and the prefix is a path
+to `w`, which `u` is on. -/
+theorem Dominates.trans {g : DepGraph verts} {u w v : Vertex verts}
+    (huw : g.Dominates u w) (hwv : g.Dominates w v) : g.Dominates u v := by
+  intro P
+  obtain ⟨Q, -, -, hQv, -⟩ := P.exists_split w (hwv P)
+  exact hQv u (huw Q)
+
 /-- A vertex unreachable from the root is dominated by everything, vacuously.
 
 So the dominator relation is a tree only on the reachable vertices. -/

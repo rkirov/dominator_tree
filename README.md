@@ -16,7 +16,7 @@ tree.
 | `Idom.lean` | existence of immediate dominators |
 | `Tree.lean` | `Tree`, acyclicity, the dominator tree |
 | `Reducible.lean` | back edges, reducibility, and an irreducible example |
-| `Algorithm.lean` | the dataflow equation and a verified single-pass dominator algorithm |
+| `Algorithm.lean` | the dataflow equation, and a verified single-pass construction of the dominator tree |
 
 ## Main results
 
@@ -34,6 +34,13 @@ tree.
   (`isIdom_of_idom?`) and, on a connected graph, total (`idom?_isSome`). It rests
   on `dominates_iff_preds`, the dataflow equation `dom v = {v} ∪ ⋂ dom (preds v)`,
   derived here directly from paths.
+- `DepGraph.domWalk` — dominance is not stored but recomputed by climbing that
+  tree, and `domWalk_iff` proves the climb decides it. Its own termination
+  relies on the tree's parents having smaller rank, so the theory is what makes
+  the definition legal.
+- `ConnectedGraph.dominates_total` — the dominators of a vertex are linearly
+  ordered, which is what lets the immediate dominator be found by a single scan
+  for the deepest one.
 - `DepGraph.Reducible` — every cycle has a header dominating all of it — with
   `forwardAcyclic_of_reducible` proving a reducible graph loses every cycle
   when back edges are deleted, and `TwoEntryLoop.not_reducible` exhibiting the
@@ -60,11 +67,9 @@ an algorithm. `Algorithm.lean` closes part of that gap: `idom?` computes the
 tree in one pass, verified against this specification, for any graph supplied
 with a topological rank. Two limits remain. The rank has to be given by the
 caller, because deriving one from acyclicity is a topological sort we have not
-formalised. And `idom?` finds each parent by searching the dominator set rather
-than by climbing the partly built tree, so it is `O(n²)` where the textbook
-version is `O(n·depth)`; making it climb needs the fact that the dominators of a
-vertex are linearly ordered, which is a generalisation of the argument already
-inside `exists_isIdom`.
+formalised. And `idom?` still materialises dominator sets on the way to the tree, so it is
+`O(n²)`; the textbook `O(n·depth)` version computes each parent as the nearest
+common ancestor of the predecessors, never building a set at all.
 
 For graphs with no topological rank — irreducible ones — the remaining
 algorithms are, in increasing order of both speed and difficulty:
