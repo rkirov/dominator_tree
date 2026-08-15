@@ -15,7 +15,6 @@ tree.
 | `Dist.lean` | shortest-path distance `IsDist`, dominance ordering, antisymmetry |
 | `Idom.lean` | existence of immediate dominators |
 | `Tree.lean` | `Tree`, acyclicity, the dominator tree |
-| `BFS.lean` | executable breadth-first levels, distance and visit order |
 
 ## Main results
 
@@ -44,9 +43,12 @@ Everything is proved: no `sorry`, no custom axioms. Some results use
 
 ## Not done yet
 
-`BFS.lean` is executable but is not yet proved to agree with `IsDist`, so
 `domTree` is noncomputable — it is the mathematical object, not an algorithm.
-Closing that gap is what a verified, computable dominator tree would need.
+Making it computable means implementing a dominator algorithm and proving it
+meets this specification. The cheapest route is Purdom–Moore: `u` dominates `v`
+exactly when deleting `u` makes `v` unreachable, so a reachability search per
+vertex decides dominance, and the immediate dominator is then read off directly
+from the definition.
 
 ## Build
 

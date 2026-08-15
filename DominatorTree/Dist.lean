@@ -94,8 +94,7 @@ theorem exists_isDist (g : ConnectedGraph verts) (v : Vertex verts) : ∃ d, g.I
 
 /-- Distance from the root, as a total function.
 
-Not the same as `DepGraph.dist?`, which computes distance by BFS; the two are
-not yet proved to agree. -/
+Noncomputable: it picks the least length among the paths reaching `v`. -/
 noncomputable def dist (g : ConnectedGraph verts) (v : Vertex verts) : Nat :=
   Classical.choose (g.exists_isDist v)
 
