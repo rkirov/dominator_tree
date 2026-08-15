@@ -3,3 +3,4 @@ import DominatorTree.Dist
 import DominatorTree.Idom
 import DominatorTree.Tree
 import DominatorTree.Reducible
+import DominatorTree.Algorithm

@@ -164,6 +164,27 @@ theorem exists_split : ∀ {u w : Vertex verts} (p : Path g u w) (x : Vertex ver
         simp [vertices]
         exact Or.inr (hrv y hy)
 
+/-- A path with at least one edge is some path to a predecessor of its endpoint,
+followed by one final edge. -/
+theorem exists_last_edge_path : ∀ {u w : Vertex verts} (p : Path g u w), 0 < p.length →
+    ∃ (x : Vertex verts) (q : Path g u x), g.Edge x w ∧ ∀ y ∈ q.vertices, y ∈ p.vertices := by
+  intro u w p
+  induction p with
+  | nil v => intro h; simp [length] at h
+  | @cons a b c hedge p' ih =>
+    intro _
+    rcases Nat.eq_zero_or_pos p'.length with h0 | hpos
+    · have hbc : b = c := eq_of_length_zero p' h0
+      subst hbc
+      exact ⟨a, .nil a, hedge, by intro y hy; simp [vertices] at hy ⊢; exact Or.inl hy⟩
+    · obtain ⟨x, q, he, hqv⟩ := ih hpos
+      refine ⟨x, .cons hedge q, he, ?_⟩
+      intro y hy
+      simp [vertices] at hy ⊢
+      rcases hy with rfl | hy
+      · exact Or.inl rfl
+      · exact Or.inr (hqv y hy)
+
 /-- A path with at least one edge has a last edge, whose source it visits. -/
 theorem exists_last_edge : ∀ {u w : Vertex verts} (p : Path g u w), 0 < p.length →
     ∃ x, x ∈ p.vertices ∧ g.Edge x w := by

@@ -16,6 +16,7 @@ tree.
 | `Idom.lean` | existence of immediate dominators |
 | `Tree.lean` | `Tree`, acyclicity, the dominator tree |
 | `Reducible.lean` | back edges, reducibility, and an irreducible example |
+| `Algorithm.lean` | the dataflow equation and a verified single-pass dominator algorithm |
 
 ## Main results
 
@@ -28,6 +29,11 @@ tree.
   `domTree_exists_path_to_root` that following parents reaches the root.
 - `DepGraph.dominates_dist_le` / `dominates_dist_lt` — a dominator is never
   further from the root, and a strict dominator is strictly closer.
+- `DepGraph.idom?` — a computable immediate-dominator tree for graphs carrying a
+  topological rank (a DAG, or a reducible graph's forward part), proved sound
+  (`isIdom_of_idom?`) and, on a connected graph, total (`idom?_isSome`). It rests
+  on `dominates_iff_preds`, the dataflow equation `dom v = {v} ∪ ⋂ dom (preds v)`,
+  derived here directly from paths.
 - `DepGraph.Reducible` — every cycle has a header dominating all of it — with
   `forwardAcyclic_of_reducible` proving a reducible graph loses every cycle
   when back edges are deleted, and `TwoEntryLoop.not_reducible` exhibiting the
@@ -49,12 +55,19 @@ Everything is proved: no `sorry`, no custom axioms. Some results use
 
 ## Next steps
 
-`domTree` is noncomputable — it is the mathematical object, not an algorithm.
-What is here is the specification an implementation has to meet.
+`ConnectedGraph.domTree` is noncomputable — it is the mathematical object, not
+an algorithm. `Algorithm.lean` closes part of that gap: `idom?` computes the
+tree in one pass, verified against this specification, for any graph supplied
+with a topological rank. Two limits remain. The rank has to be given by the
+caller, because deriving one from acyclicity is a topological sort we have not
+formalised. And `idom?` finds each parent by searching the dominator set rather
+than by climbing the partly built tree, so it is `O(n²)` where the textbook
+version is `O(n·depth)`; making it climb needs the fact that the dominators of a
+vertex are linearly ordered, which is a generalisation of the argument already
+inside `exists_isIdom`.
 
-The next step is to write the three known dominator algorithms and prove each
-correct against that specification, in increasing order of both speed and
-difficulty.
+For graphs with no topological rank — irreducible ones — the remaining
+algorithms are, in increasing order of both speed and difficulty:
 
 - **Purdom–Moore**, `O(n·(n+m))`. `u` dominates `v` exactly when deleting `u`
   makes `v` unreachable, so one reachability search per vertex decides
